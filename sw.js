@@ -1,11 +1,14 @@
 /* Vehicle English PWA Service Worker：应用壳离线缓存 */
-const CACHE = "ve-cache-v1";
+const CACHE = "ve-cache-v3";
 const SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
   "./manifest.webmanifest",
+  "./apple-touch-icon.png",
+  "./icons/icon-120.png",
+  "./icons/icon-152.png",
   "./icons/icon-180.png",
   "./icons/icon-512.png"
 ];

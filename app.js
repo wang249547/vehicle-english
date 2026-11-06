@@ -119,13 +119,54 @@ function speakTTS(text) {
   } catch (e) { return false; }
 }
 
-/* ---------- 对/错音效提示（WebAudio，无需联网） ---------- */
+/* ---------- iOS 兼容音频内核：首次用户手势解锁 AudioContext，后续异步播放不被拦截 ---------- */
 let _actx = null;
+function ensureCtx() {
+  _actx = _actx || new (window.AudioContext || window.webkitAudioContext)();
+  if (_actx.state === "suspended") _actx.resume().catch(() => {});
+  return _actx;
+}
+function unlockAudio() {
+  try {
+    const ctx = ensureCtx();
+    const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.connect(ctx.destination); src.start(0);
+  } catch (e) { /* 忽略 */ }
+}
+document.addEventListener("pointerdown", unlockAudio, { once: true, capture: true });
+document.addEventListener("keydown", unlockAudio, { once: true, capture: true });
+
+function dataUrlToBuffer(u) {
+  const bin = atob(u.split(",")[1] || "");
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr.buffer;
+}
+
+/* 用 WebAudio 解码播放（iOS 上唯一可靠的异步播放途径） */
+async function playBuf(buf) {
+  const ctx = ensureCtx();
+  try {
+    const ab = await ctx.decodeAudioData(buf.slice(0));
+    const s = ctx.createBufferSource();
+    s.buffer = ab; s.connect(ctx.destination); s.start(0);
+  } catch (e) {
+    // 解码失败退回 ObjectURL+Audio（桌面浏览器可用）
+    try {
+      const url = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
+      const a = new Audio(url);
+      a.play().catch(() => {});
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e2) { /* 忽略 */ }
+  }
+}
+
+/* ---------- 对/错音效提示（WebAudio，无需联网） ---------- */
 function playSfx(type) {
   try {
-    _actx = _actx || new (window.AudioContext || window.webkitAudioContext)();
-    if (_actx.state === "suspended") _actx.resume();
-    const t = _actx.currentTime;
+    const ctx = ensureCtx();
+    const t = ctx.currentTime;
     if (type === "ok") { [1046.5, 1318.5, 1568.0].forEach((f, i) => beep(f, t + i * .09, .18, "sine", .22)); }
     else { beep(200, t, .22, "square", .18); beep(150, t + .16, .3, "square", .18); }
   } catch (e) { /* 忽略 */ }
@@ -140,16 +181,21 @@ function beep(freq, start, dur, wave, vol) {
   o.start(start); o.stop(start + dur + .05);
 }
 
-/* 播放发音：缩略词若有全称，优先读全称的发音；本地缓存 → 网络音频(顺手缓存) → 浏览器 TTS 兜底 */
+/* 播放发音：缩略词有全称时优先读全称；缓存/网络音频 → WebAudio 直放 → TTS 兜底 */
 async function playAudio(entry) {
   if (!entry) return;
   const text = entry.full || entry.word;
   const cacheKey = text.toLowerCase();
-  const cached = await idbGet(cacheKey);
-  if (cached) { new Audio(cached).play().catch(() => speakTTS(text)); return; }
+  try {
+    let cached = await idbGet(cacheKey);
+    if (cached) {
+      if (typeof cached === "string") cached = dataUrlToBuffer(cached); // 兼容旧版 dataURL 缓存
+      await playBuf(cached);
+      return;
+    }
+  } catch (e) { /* 继续 */ }
   let url = entry.full ? entry.fullAudioUrl : entry.audioUrl;
   if (!url) {
-    // 未缓存音频：联网查该文本的发音音频并记入词条
     try {
       const d = await fetchDictionary(text);
       if (d.audioUrl) {
@@ -161,18 +207,16 @@ async function playAudio(entry) {
   }
   if (url) {
     try {
-      const resp = await fetch(url);
+      const resp = await fetchWithTimeout(url, 8000);
       if (resp.ok) {
-        const blob = await resp.blob();
-        const dataUrl = await blobToDataURL(blob);
-        await idbPut(cacheKey, dataUrl);
-        new Audio(dataUrl).play().catch(() => speakTTS(text));
+        const buf = await resp.arrayBuffer();
+        try { await idbPut(cacheKey, buf.slice(0)); } catch (e) { /* 存缓存失败不影响播放 */ }
+        await playBuf(buf);
         return;
       }
     } catch (e) {
-      // fetch 被 CORS 拦截时直接流式播放
-      const a = new Audio(url);
-      a.play().then(() => {}).catch(() => speakTTS(text));
+      // fetch 被 CORS 拦截（iPhone 上常见）：直接用 TTS 读，避免无声
+      speakTTS(text);
       return;
     }
   }
