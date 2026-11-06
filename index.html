@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Vehicle English</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Vehicle English">
+<meta name="theme-color" content="#4f46e5">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand" id="btnHome">🚗 Vehicle English</div>
+    <nav class="nav" id="nav">
+      <button data-view="wordbank" class="navbtn">① 单词库</button>
+      <button data-view="review" class="navbtn">② 复习</button>
+      <button data-view="battle" class="navbtn">③ 单词大乱斗</button>
+      <button data-view="wrong" class="navbtn">④ 错题库</button>
+    </nav>
+  </header>
+  <div id="toast" class="toast hidden"></div>
+  <main id="main"></main>
+</div>
+<script src="app.js"></script>
+<script>
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>

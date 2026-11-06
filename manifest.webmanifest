@@ -1,0 +1,15 @@
+{
+  "name": "Vehicle English",
+  "short_name": "Vehicle English",
+  "description": "汽车行业英语学习小程序：单词库 · 复习 · 大乱斗 · 错题库",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "icons/icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
